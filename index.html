@@ -1,233 +1,179 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>給爸爸的運動追蹤器</title>
-    <!-- Tailwind CSS 讓 UI 樣式更美觀，支援響應式設計 -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        video {
-            -webkit-transform: scaleX(-1);
-            transform: scaleX(-1);
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>給爸爸的運動追蹤器</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; }
+    video { transform: scaleX(-1); }
+  </style>
 </head>
 <body class="bg-gray-800 text-gray-100 flex flex-col items-center justify-center min-h-screen p-4 md:p-8">
+  <div id="app" class="bg-gray-700 p-6 md:p-10 rounded-3xl shadow-2xl max-w-sm md:max-w-md w-full text-center space-y-6">
+    <h1 class="text-3xl md:text-4xl font-bold mb-2 md:mb-4">給爸爸的運動挑戰</h1>
+    <p id="status" class="text-gray-300 text-lg">點擊開始以載入模型...</p>
 
-    <!-- 主應用程式容器 -->
-    <div id="app" class="bg-gray-700 p-6 md:p-10 rounded-3xl shadow-2xl max-w-sm md:max-w-md w-full text-center space-y-6">
-        <h1 class="text-3xl md:text-4xl font-bold mb-2 md:mb-4">給爸爸的運動挑戰</h1>
-        <p id="status" class="text-gray-300 text-lg">點擊開始以載入模型...</p>
-
-        <!-- 影片畫面與進度顯示區塊 -->
-        <div id="video-container" class="flex flex-col items-center space-y-4">
-            <video id="webcam-video" class="w-full max-w-xs md:max-w-sm rounded-xl border-4 border-gray-500 transition-all duration-500 opacity-0 h-0" autoplay playsinline></video>
-            <div id="progress-container" class="w-full">
-                <div class="bg-gray-600 rounded-full h-4 overflow-hidden mb-2">
-                    <div id="progress-bar" class="bg-green-500 h-full transition-all duration-500" style="width: 0%;"></div>
-                </div>
-                <p class="text-lg font-semibold">
-                    已運動時間：<span id="exercise-time" class="text-green-400">00:00</span> / 30:00
-                </p>
-                <p id="movement-status" class="text-sm text-gray-400 mt-1">狀態：</p>
-            </div>
+    <div id="video-container" class="flex flex-col items-center space-y-4">
+      <video id="webcam-video" class="w-full max-w-xs md:max-w-sm rounded-xl border-4 border-gray-500 transition-all duration-500 opacity-0 h-0" autoplay playsinline></video>
+      <div id="progress-container" class="w-full">
+        <div class="bg-gray-600 rounded-full h-4 overflow-hidden mb-2">
+          <div id="progress-bar" class="bg-green-500 h-full transition-all duration-500" style="width: 0%;"></div>
         </div>
-
-        <!-- 按鈕區塊 -->
-        <div id="button-container">
-            <button id="start-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 transform hover:scale-105" disabled>
-                正在載入...
-            </button>
-        </div>
-        
-        <!-- 挑戰完成訊息 -->
-        <div id="completion-message" class="bg-green-700 text-white p-6 rounded-xl shadow-md mt-6 hidden">
-            <p class="text-2xl font-bold">挑戰完成！🎉</p>
-            <p class="mt-2 text-sm">密碼已發送至電腦。</p>
-        </div>
+        <p class="text-lg font-semibold">
+          已運動時間：<span id="exercise-time" class="text-green-400">00:00</span> / 30:00
+        </p>
+        <p id="movement-status" class="text-sm text-gray-400 mt-1">狀態：</p>
+      </div>
     </div>
 
-    <!-- Firebase 和 TensorFlow.js 函式庫 -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.13.0/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/movenet@1.0.0/dist/movenet.min.js"></script>
+    <div id="button-container">
+      <button id="start-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transition duration-300 transform hover:scale-105" disabled>
+        正在載入...
+      </button>
+    </div>
 
-    <!-- 核心 JavaScript 邏輯 -->
-    <script>
-        // 全域變數
-        const MIN_EXERCISE_TIME = 30 * 60;
-        let model;
-        let exerciseTime = 0;
-        let isMoving = false;
-        let isWebcamActive = false;
-        let isChallengeComplete = false;
-        let intervalRef;
-        let animationFrameRef;
-        let db, auth, userId;
-        
-        // DOM 元素
-        const startButton = document.getElementById('start-button');
-        const webcamVideo = document.getElementById('webcam-video');
-        const statusElement = document.getElementById('status');
-        const exerciseTimeElement = document.getElementById('exercise-time');
-        const movementStatusElement = document.getElementById('movement-status');
-        const progressBar = document.getElementById('progress-bar');
-        const completionMessage = document.getElementById('completion-message');
-        const videoContainer = document.getElementById('video-container');
+    <div id="completion-message" class="bg-green-700 text-white p-6 rounded-xl shadow-md mt-6 hidden">
+      <p class="text-2xl font-bold">挑戰完成！🎉</p>
+      <p class="mt-2 text-sm">密碼已發送至電腦。</p>
+    </div>
+  </div>
 
-        // 初始化 Firebase
-        const initializeFirebase = async () => {
-            try {
-                // TODO: 請將以下 firebaseConfig 替換為你自己的專案設定
-                const firebaseConfig = {
-                    apiKey: "YOUR_API_KEY",
-                    authDomain: "YOUR_AUTH_DOMAIN",
-                    projectId: "YOUR_PROJECT_ID",
-                    storageBucket: "YOUR_STORAGE_BUCKET",
-                    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-                    appId: "YOUR_APP_ID"
-                };
-                
-                // 使用 Firebase v8 語法
-                firebase.initializeApp(firebaseConfig);
-                auth = firebase.auth();
-                db = firebase.firestore();
+  <!-- TensorFlow -->
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.13.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection"></script>
 
-                await auth.signInAnonymously();
-                userId = auth.currentUser.uid;
-                
-                console.log("Firebase 初始化成功。");
+  <script>
+    const MIN_EXERCISE_TIME = 30 * 60; // 30 分鐘
+    let model;
+    let detector;
+    let exerciseTime = 0;
+    let isMoving = false;
+    let isChallengeComplete = false;
+    let isWebcamActive = false;
+    let animationFrameRef;
+    let intervalRef;
 
-                // 載入 TensorFlow.js 模型
-                await loadModel();
-            } catch (error) {
-                console.error("Firebase 初始化錯誤:", error);
-                statusElement.textContent = "Firebase 初始化失敗。";
-            }
-        };
+    const webcamVideo = document.getElementById("webcam-video");
+    const startButton = document.getElementById("start-button");
+    const statusElement = document.getElementById("status");
+    const movementStatusElement = document.getElementById("movement-status");
+    const progressBar = document.getElementById("progress-bar");
+    const exerciseTimeElement = document.getElementById("exercise-time");
+    const completionMessage = document.getElementById("completion-message");
 
-        // 載入 TensorFlow.js 模型
-        const loadModel = async () => {
-            statusElement.textContent = "正在載入模型，請稍候...";
-            try {
-                // 等待 movenet 函式庫載入
-                if (typeof movenet === 'undefined') {
-                    console.error("movenet 函式庫未載入。");
-                    statusElement.textContent = "載入模型失敗，請檢查網路連線。";
-                    return;
-                }
-                
-                model = await movenet.load("https://tfhub.dev/google/movenet/singlepose/lightning/4");
-                statusElement.textContent = "模型載入完成！請點擊開始。";
-                startButton.disabled = false;
-                startButton.textContent = "開始挑戰";
-            } catch (error) {
-                statusElement.textContent = "載入模型失敗，請檢查網路連線。";
-                console.error("載入模型失敗:", error);
-            }
-        };
+    // 載入模型
+    const loadModel = async () => {
+      statusElement.textContent = "正在載入模型...";
+      try {
+        detector = await poseDetection.createDetector(poseDetection.SupportedModels.MoveNet, {
+          modelType: poseDetection.movenet.modelType.SINGLEPOSE_LIGHTNING
+        });
+        statusElement.textContent = "模型載入完成，請點擊開始。";
+        startButton.disabled = false;
+        startButton.textContent = "開始挑戰";
+      } catch (error) {
+        statusElement.textContent = "模型載入失敗，請檢查網路。";
+        console.error("模型載入錯誤:", error);
+      }
+    };
 
-        // 啟動攝像頭
-        const startWebcam = async () => {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-                webcamVideo.srcObject = stream;
-                await webcamVideo.play();
-                statusElement.textContent = "請開始運動！";
-                isWebcamActive = true;
-                webcamVideo.classList.remove('opacity-0', 'h-0');
-                webcamVideo.classList.add('opacity-100', 'h-auto');
-                runPoseDetection();
-                startTimer();
-            } catch (err) {
-                statusElement.textContent = "無法取得攝像頭權限。";
-                console.error("攝像頭權限錯誤:", err);
-            }
-        };
+    // 啟動攝影機
+    const startWebcam = async () => {
+      startButton.disabled = true;
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        webcamVideo.srcObject = stream;
+        await webcamVideo.play();
+        isWebcamActive = true;
+        webcamVideo.classList.remove("opacity-0", "h-0");
+        webcamVideo.classList.add("opacity-100", "h-auto");
+        statusElement.textContent = "請開始運動！";
+        runPoseDetection();
+        startTimer();
+      } catch (err) {
+        statusElement.textContent = "無法存取相機，請檢查權限或裝置支援性。";
+        console.error("Webcam 錯誤:", err);
+      }
+    };
 
-        // 姿勢偵測迴圈
-        const runPoseDetection = async () => {
-            if (isWebcamActive && webcamVideo.readyState === 4) {
-                const keypoints = await model.estimateSinglePose(webcamVideo);
-                const moving = detectMovement(keypoints);
-                isMoving = moving;
-                movementStatusElement.textContent = `狀態：${isMoving ? "正在運動中 💪" : "請開始動一動！"}`;
-            }
-            animationFrameRef = requestAnimationFrame(runPoseDetection);
-        };
+    // 姿勢偵測
+    const runPoseDetection = async () => {
+      if (isWebcamActive && webcamVideo.readyState >= 2) {
+        const poses = await detector.estimatePoses(webcamVideo);
+        if (poses.length > 0) {
+          const keypoints = poses[0].keypoints;
+          isMoving = detectMovement(keypoints);
+          movementStatusElement.textContent = `狀態：${isMoving ? "正在運動中 💪" : "請開始動一動！"}`;
+        }
+      }
+      animationFrameRef = requestAnimationFrame(runPoseDetection);
+    };
 
-        // 偵測移動
-        const detectMovement = (keypoints) => {
-            const keypointThreshold = 0.5;
-            const visibleKeypoints = keypoints.keypoints.filter(kp => kp.score > keypointThreshold);
-            return visibleKeypoints.length > 5;
-        };
+    // 簡易的動作判定邏輯
+    const detectMovement = (keypoints) => {
+      const visible = keypoints.filter(kp => kp.score > 0.5);
+      return visible.length > 5;
+    };
 
-        // 計時器
-        const startTimer = () => {
-            if (!intervalRef) {
-                intervalRef = setInterval(() => {
-                    if (isMoving && exerciseTime < MIN_EXERCISE_TIME) {
-                        exerciseTime++;
-                        updateUI();
-                    }
-                    if (exerciseTime >= MIN_EXERCISE_TIME && !isChallengeComplete) {
-                        completeChallenge();
-                    }
-                }, 1000);
-            }
-        };
+    // 啟動計時器
+    const startTimer = () => {
+      intervalRef = setInterval(() => {
+        if (isMoving && exerciseTime < MIN_EXERCISE_TIME) {
+          exerciseTime++;
+          updateUI();
+        }
+        if (exerciseTime >= MIN_EXERCISE_TIME && !isChallengeComplete) {
+          completeChallenge();
+        }
+      }, 1000);
+    };
 
-        // 更新 UI
-        const updateUI = () => {
-            const minutes = Math.floor(exerciseTime / 60);
-            const seconds = exerciseTime % 60;
-            exerciseTimeElement.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            progressBar.style.width = `${(exerciseTime / MIN_EXERCISE_TIME) * 100}%`;
-        };
+    // 更新畫面進度條與時間
+    const updateUI = () => {
+      const minutes = String(Math.floor(exerciseTime / 60)).padStart(2, '0');
+      const seconds = String(exerciseTime % 60).padStart(2, '0');
+      exerciseTimeElement.textContent = `${minutes}:${seconds}`;
+      progressBar.style.width = `${(exerciseTime / MIN_EXERCISE_TIME) * 100}%`;
+    };
 
-        // 完成挑戰
-        const completeChallenge = async () => {
-            isChallengeComplete = true;
-            isWebcamActive = false;
-            if (intervalRef) clearInterval(intervalRef);
-            if (animationFrameRef) cancelAnimationFrame(animationFrameRef);
-            
-            if (webcamVideo.srcObject) {
-                webcamVideo.srcObject.getTracks().forEach(track => track.stop());
-            }
-            webcamVideo.classList.remove('opacity-100');
-            webcamVideo.classList.add('opacity-0', 'h-0');
+    // 完成挑戰
+    const completeChallenge = async () => {
+      isChallengeComplete = true;
+      clearInterval(intervalRef);
+      cancelAnimationFrame(animationFrameRef);
 
-            const writeData = async () => {
-                if (db && userId) {
-                    const password = Math.random().toString(36).substring(2, 10);
-                    const docRef = db.collection('artifacts').doc('default-app-id').collection('users').doc(userId).collection('challenges').doc();
-                    await docRef.set({
-                        completed: true,
-                        time_seconds: exerciseTime,
-                        password: password,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                    
-                    document.getElementById('video-container').style.display = 'none';
-                    document.getElementById('button-container').style.display = 'none';
-                    completionMessage.classList.remove('hidden');
-                }
-            };
-            await writeData();
-        };
+      // 停止攝像頭
+      if (webcamVideo.srcObject) {
+        webcamVideo.srcObject.getTracks().forEach(track => track.stop());
+      }
+      webcamVideo.classList.add('opacity-0', 'h-0');
 
-        startButton.addEventListener('click', startWebcam);
-        
-        window.onload = initializeFirebase;
-    </script>
+      // 呼叫本地伺服器 API
+      try {
+        const response = await fetch("http://localhost:5000/challenge-complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ completed: true, time: exerciseTime })
+        });
+
+        if (!response.ok) throw new Error("伺服器錯誤");
+
+        document.getElementById("video-container").style.display = "none";
+        document.getElementById("button-container").style.display = "none";
+        completionMessage.classList.remove("hidden");
+        statusElement.textContent = "🎉 挑戰已完成！";
+      } catch (err) {
+        console.error("API 發送失敗：", err);
+        statusElement.textContent = "挑戰完成，但無法連接到本地伺服器。";
+      }
+    };
+
+    // 初始化
+    window.onload = loadModel;
+    startButton.addEventListener("click", startWebcam);
+  </script>
 </body>
 </html>
