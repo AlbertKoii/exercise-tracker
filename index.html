@@ -53,9 +53,9 @@
     </div>
 
     <!-- Firebase 和 TensorFlow.js 函式庫 -->
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.13.0/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/movenet@1.0.0/dist/movenet.min.js"></script>
 
@@ -85,16 +85,31 @@
         // 初始化 Firebase
         const initializeFirebase = async () => {
             try {
-                // 安全地使用環境變數
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-                const app = firebase.initializeApp(firebaseConfig);
+                // TODO: 請將以下 firebaseConfig 替換為你自己的專案設定
+                const firebaseConfig = {
+                    apiKey: "YOUR_API_KEY",
+                    authDomain: "YOUR_AUTH_DOMAIN",
+                    projectId: "YOUR_PROJECT_ID",
+                    storageBucket: "YOUR_STORAGE_BUCKET",
+                    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+                    appId: "YOUR_APP_ID"
+                };
+                
+                // 使用 Firebase v8 語法
+                firebase.initializeApp(firebaseConfig);
                 auth = firebase.auth();
                 db = firebase.firestore();
 
                 await auth.signInAnonymously();
                 userId = auth.currentUser.uid;
+                
+                console.log("Firebase 初始化成功。");
+
+                // 載入 TensorFlow.js 模型
+                await loadModel();
             } catch (error) {
                 console.error("Firebase 初始化錯誤:", error);
+                statusElement.textContent = "Firebase 初始化失敗。";
             }
         };
 
@@ -102,6 +117,13 @@
         const loadModel = async () => {
             statusElement.textContent = "正在載入模型，請稍候...";
             try {
+                // 等待 movenet 函式庫載入
+                if (typeof movenet === 'undefined') {
+                    console.error("movenet 函式庫未載入。");
+                    statusElement.textContent = "載入模型失敗，請檢查網路連線。";
+                    return;
+                }
+                
                 model = await movenet.load("https://tfhub.dev/google/movenet/singlepose/lightning/4");
                 statusElement.textContent = "模型載入完成！請點擊開始。";
                 startButton.disabled = false;
@@ -121,7 +143,7 @@
                 statusElement.textContent = "請開始運動！";
                 isWebcamActive = true;
                 webcamVideo.classList.remove('opacity-0', 'h-0');
-                webcamVideo.classList.add('opacity-100');
+                webcamVideo.classList.add('opacity-100', 'h-auto');
                 runPoseDetection();
                 startTimer();
             } catch (err) {
@@ -178,7 +200,9 @@
             if (intervalRef) clearInterval(intervalRef);
             if (animationFrameRef) cancelAnimationFrame(animationFrameRef);
             
-            webcamVideo.srcObject.getTracks().forEach(track => track.stop());
+            if (webcamVideo.srcObject) {
+                webcamVideo.srcObject.getTracks().forEach(track => track.stop());
+            }
             webcamVideo.classList.remove('opacity-100');
             webcamVideo.classList.add('opacity-0', 'h-0');
 
@@ -203,12 +227,7 @@
 
         startButton.addEventListener('click', startWebcam);
         
-        // 確保程式碼在函式庫載入後立即執行
-        window.onload = () => {
-          initializeFirebase().then(() => {
-              loadModel();
-          });
-        };
+        window.onload = initializeFirebase;
     </script>
 </body>
 </html>
