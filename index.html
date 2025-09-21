@@ -61,7 +61,7 @@
 
     <!-- 核心 JavaScript 邏輯 -->
     <script>
-        // 全局變數
+        // 全域變數
         const MIN_EXERCISE_TIME = 30 * 60;
         let model;
         let exerciseTime = 0;
@@ -80,6 +80,7 @@
         const movementStatusElement = document.getElementById('movement-status');
         const progressBar = document.getElementById('progress-bar');
         const completionMessage = document.getElementById('completion-message');
+        const videoContainer = document.getElementById('video-container');
 
         // 初始化 Firebase
         const initializeFirebase = async () => {
@@ -203,9 +204,11 @@
         startButton.addEventListener('click', startWebcam);
         
         // 確保程式碼在函式庫載入後立即執行
-        initializeFirebase().then(() => {
-            loadModel();
-        });
+        window.onload = () => {
+          initializeFirebase().then(() => {
+              loadModel();
+          });
+        };
     </script>
 </body>
 </html>
